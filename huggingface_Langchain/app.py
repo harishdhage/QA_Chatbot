@@ -1,11 +1,12 @@
+import os
 import streamlit as st
 from urllib.parse import urlparse
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_community.document_loaders import YoutubeLoader, UnstructuredURLLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter  # Updated import
+from langchain_huggingface import HuggingFaceEndpoint
 
 
 # ---------------------------
@@ -32,13 +33,13 @@ st.subheader("Paste a URL or YouTube link below to get a summary")
 
 # Sidebar – API key
 with st.sidebar:
-    nvidia_api_key = st.text_input(
-        "Enter your NVIDIA API key",
+    hf_api_key = st.text_input(
+        "Enter your Huggingface API key",
         value="",
         type="password",
     )
     st.markdown(
-        "Model: `google/gemma-4-31b-it` via NVIDIA NIM\n\n"
+        "Model: `microsoft/FastContext-1.0-4B-SFT\n\n"
         "Make sure your key has access to this model."
     )
 
@@ -55,12 +56,11 @@ generic_url = st.text_input(
 # ---------------------------
 # LLM + Modern LCEL Chains
 # ---------------------------
-
-def get_llm(api_key: str) -> ChatNVIDIA:
-    return ChatNVIDIA(
-        model="minimaxai/minimax-m3",
-        nvidia_api_key=api_key,
-        #base_url="https://integrate.api.nvidia.com/v1/chat/completions",
+def get_llm(api_key: str) -> HuggingFaceEndpoint:
+    return HuggingFaceEndpoint(
+        repo_id="meta-llama/Llama-3.1-8B",
+        huggingfacehub_api_token=api_key,
+        max_new_tokens=600,
         temperature=0.7
     )
 
@@ -81,7 +81,7 @@ combine_prompt = ChatPromptTemplate.from_messages([
 # ---------------------------
 
 if st.button("Summarize the content"):
-    if not nvidia_api_key.strip() or not generic_url.strip():
+    if not hf_api_key.strip() or not generic_url.strip():
         st.error("Please provide both a valid NVIDIA API key and a URL.")
     elif not is_valid_url(generic_url):
         st.error("Please enter a valid URL (starting with http or https).")
@@ -118,7 +118,7 @@ if st.button("Summarize the content"):
                 split_docs = splitter.split_documents(docs)
 
                 # 3. Build LLM and modern chains via LCEL
-                llm = get_llm(nvidia_api_key)
+                llm = get_llm(hf_api_key)
                 
                 # Create individual chains
                 map_chain = map_prompt | llm | StrOutputParser()
@@ -126,7 +126,13 @@ if st.button("Summarize the content"):
 
                 # Execute the "Map" step: summarize each chunk in parallel
                 # We extract the page_content string from each Document object
-                chunk_summaries = map_chain.batch([{"text": doc.page_content} for doc in split_docs])
+                '''chunk_summaries = map_chain.batch([{"text": doc.page_content} for doc in split_docs],
+                                                  config={"max_concurrency": 1} )''' # Change to 2 or 3 if your key supports it
+                # Process each chunk sequentially to avoid triggering HF rate limits
+                chunk_summaries = []
+                for doc in split_docs:
+                    summary = map_chain.invoke({"text": doc.page_content},config={"max_concurrency": 1})
+                    chunk_summaries.append(summary)
 
                 # Combine the intermediate summaries together into one string
                 joined_summaries = "\n\n".join(chunk_summaries)

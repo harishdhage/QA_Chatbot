@@ -7,10 +7,10 @@ from langchain_community.utilities import WikipediaAPIWrapper, ArxivAPIWrapper
 from langchain_classic.agents import AgentType, initialize_agent
 from langchain_classic.callbacks import StreamlitCallbackHandler
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
-import os
-from dotenv import load_dotenv
+#import os
+#from dotenv import load_dotenv
 
-load_dotenv()
+#load_dotenv()
 
 # Used the inbuilt tool of wikipedia
 api_wiki_wrapper = WikipediaAPIWrapper(top_k_results=1, doc_content_chars_max=250)
@@ -28,7 +28,7 @@ st.title("Enhanced Langchain Chat with search")
 st.sidebar.title("Setting")
 # 1. Fallback to .env if user hasn't typed anything in the sidebar yet
 user_api_key = st.sidebar.text_input('Enter your NVIDIA API key :', type="password")
-nvidia_api_key = user_api_key if user_api_key else os.getenv("NVIDIA_API_KEY")
+nvidia_api_key = user_api_key #if user_api_key else os.getenv("NVIDIA_API_KEY")
 
 # This is default message for search bot on first load
 if "messages" not in st.session_state:
